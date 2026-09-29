@@ -185,9 +185,9 @@ for (const name of pairs) {
   });
 }
 
-test('paste-into-google/ is up to date (run `npm run build` if this fails)', () => {
-  const { bundle, out } = require('../build.js');
+test('built files are up to date (run `npm run build` if this fails)', () => {
+  const { bundle } = require('../build.js');
   for (const [name, text] of Object.entries(bundle())) {
-    assert.strictEqual(fs.readFileSync(path.join(out, name), 'utf8'), text, name);
+    assert.strictEqual(fs.readFileSync(path.join(__dirname, '..', name), 'utf8'), text, name);
   }
 });

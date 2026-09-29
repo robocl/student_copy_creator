@@ -93,21 +93,7 @@ function createStudentCopy(teacherDocId) {
   };
 }
 
-/** Steps from "HOW TO: Making Student Copies" that still need a person. */
-var MANUAL_CHECKS = [
-  'Page 1 has the large CommonLit logo and the other pages have the small one.',
-  'Answer boxes are a reasonable size (the short response box should run the length of the page).',
-  'No question is split across two pages, and questions still line up with their paragraphs.',
-  'Link the student copy in the Dig Guide (set to "force copy") and in the tracker, then turn the box blue.'
-];
 
-function studentCopyName(name) {
-  var n = name.replace(/^Copy of\s+/i, '');
-  var out = n.replace(/TEACHER([ _-])COPY/i, function (m, sep) {
-    return m === m.toUpperCase() ? 'STUDENT' + sep + 'COPY' : 'Student' + sep + 'Copy';
-  });
-  return out === n ? n + ' (Student Copy)' : out;
-}
 
 /** The main body, plus every tab's body for docs that use tabs. */
 function allBodies(doc) {
@@ -136,24 +122,5 @@ function headerFooterSections(doc) {
     if (type === DocumentApp.ElementType.HEADER_SECTION) out.push(child.asHeaderSection());
     if (type === DocumentApp.ElementType.FOOTER_SECTION) out.push(child.asFooterSection());
   }
-  return out;
-}
-
-function summarize(r) {
-  var out = [];
-  var add = function (n, one, many) { if (n) out.push(n + ' ' + (n === 1 ? one : many)); };
-  add(r.coverElementsRemoved, 'cover-page element removed', 'cover-page elements removed');
-  add(r.teacherNotesRemoved, 'teacher note removed', 'teacher notes removed');
-  add(r.titlePrefixesRemoved, '"TEACHER COPY" label removed', '"TEACHER COPY" labels removed');
-  add(r.answersBlanked, 'answer replaced with writing space', 'answers replaced with writing space');
-  add(r.inlineAnswersRemoved, 'inline answer removed', 'inline answers removed');
-  add(r.choicesUnmarked, 'highlighted choice un-highlighted', 'highlighted choices un-highlighted');
-  add(r.optionalMarkersRemoved, 'optional-question "*" removed', 'optional-question "*" markers removed');
-  add(r.optionalQuestionsRemoved, 'optional (*) question deleted', 'optional (*) questions deleted');
-  add(r.teacherBoxesRemoved, '"Notes to Teacher" box deleted', '"Notes to Teacher" boxes deleted');
-  add(r.highlightsRemoved, 'highlight removed', 'highlights removed');
-  add(r.headerLabelsChanged, 'header changed to "Student Copy"', 'headers changed to "Student Copy"');
-  add(r.footerLinesReplaced, 'footer copyright line changed to the CC BY-NC-SA line', 'footer copyright lines changed to the CC BY-NC-SA line');
-  if (!out.length) out.push('No changes were needed.');
   return out;
 }

@@ -3,9 +3,13 @@
   "private": true,
   "description": "Turns CommonLit teacher-copy Google Docs into student copies (Google Apps Script).",
   "scripts": {
-    "test": "node --test test/converter.test.js",
+    "test": "node --test test/converter.test.js test/docx.test.js",
     "build": "node build.js",
     "push": "clasp push",
     "deploy": "clasp push && clasp deploy"
+  },
+  "devDependencies": {
+    "@xmldom/xmldom": "^0.9.12",
+    "jszip": "^3.10.1"
   }
 }

@@ -1,10 +1,11 @@
 # Student Copy Creator
 
-Turns a CommonLit **teacher copy** Google Doc into a **student copy** in one click.
+Turns a CommonLit **teacher copy** into a **student copy**. It follows the "HOW TO: Making Student Copies for a 360 Unit" guide.
 
-A curriculum writer opens a simple internal web page, pastes the teacher copy's link, and clicks a button. A few seconds later they get a link to the new student copy. It's saved in the same Drive folder, and the teacher copy is never changed.
+The tool comes in two forms. Both use the same rules:
 
-It follows the "HOW TO: Making Student Copies for a 360 Unit" guide.
+1. **Prototype web page (no setup, try it now).** In Google Docs, use File → Download → Microsoft Word (.docx). Drop the file on the page, save the student copy it gives back, and upload that to Drive. The conversion happens inside your browser, so nothing is uploaded anywhere and nothing is installed in CommonLit's Google account. The page is built from `web/` into `dist/student-copy-creator.html`.
+2. **Google Docs version (later, needs approval).** Paste a teacher copy link and the student copy appears in the same Drive folder, with no download or upload step. This one has to be set up inside CommonLit's Google account (see "Setup" below), so check with IT first.
 
 ## What it does
 
@@ -35,7 +36,7 @@ The tool also lists anything it wasn't sure about under **Please check**, for ex
 
 **It depends on writers keeping to these habits:** answers are exactly the standard blue (#0000FF), the student part starts with the Name / Class box, and teacher notes sit in their own paragraph or box.
 
-## Setup (one time, about 10 minutes, no coding)
+## Setup for the Google Docs version (one time, about 10 minutes, no coding)
 
 One person does this once. Everyone else just uses the link it produces.
 
@@ -75,8 +76,9 @@ If the teacher copy is a Word file (.docx) in Drive, open it and use **File → 
 ## For developers
 
 - `apps-script/`: the source. `Converter.js` holds the conversion rules (settings are in `DEFAULTS` at the top, e.g. `optionalQuestions: 'unmark'` keeps optional questions but drops the `*`). `Code.js` holds the web app, Drive copy, and header/footer handling. `Index.html` is the page.
-- `paste-into-google/`: the same code bundled into two files for copy and paste. Regenerate it with `npm run build`. A test fails if you forget.
-- `npm test` runs the rules against a mock of Google's DocumentApp (`test/mock-docs.js`). You can add golden tests from real teacher/student pairs with `test/docx_to_json.py` (see `test/fixtures/README.md`). Fixtures are git-ignored because teacher copies contain answer keys.
+- `web/`: the prototype page. `docx-adapter.js` lets the same `Converter.js` rules edit a Word file directly, and `page.html` is the page.
+- `paste-into-google/` and `dist/`: built files (the Google paste bundle and the web page). Regenerate them with `npm run build`. A test fails if you forget.
+- `npm test` runs the rules against a mock of Google's DocumentApp (`test/mock-docs.js`), and end to end on .docx files (`test/docx.test.js`). For .docx golden tests, drop `<name>.teacher.docx` and `<name>.student.docx` into `test/fixtures/`. You can add golden tests from real teacher/student pairs with `test/docx_to_json.py` (see `test/fixtures/README.md`). Fixtures are git-ignored because teacher copies contain answer keys.
 - You can also deploy with [clasp](https://github.com/google/clasp) (`.clasp.json.example`, `npm run deploy`) instead of copying and pasting.
 
 The mock only follows Google's documentation. Real-Doc quirks will only show up by running the tool on real teacher copies.
