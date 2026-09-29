@@ -35,6 +35,8 @@ def paragraph(p):
         color = val(rpr, 'color')
         color = None if color in (None, 'auto', 'true') else '#' + color.lower()
         bold = truthy(val(rpr, 'b'))
+        hl = val(rpr, 'highlight')
+        bg = None if hl in (None, 'none', 'true') else hl
         text = ''
         for child in r:
             if child.tag == W + 't':
@@ -44,7 +46,7 @@ def paragraph(p):
             elif child.tag == W + 'br' and child.get(W + 'type') == 'page':
                 out['pageBreak'] = True
         if text:
-            out['runs'].append({'text': text, 'color': color, 'bold': bold})
+            out['runs'].append({'text': text, 'color': color, 'bold': bold, 'bg': bg})
     return out
 
 

@@ -7,7 +7,8 @@
 
 const ElementType = {
   BODY_SECTION: 'BODY_SECTION', PARAGRAPH: 'PARAGRAPH', LIST_ITEM: 'LIST_ITEM',
-  TABLE: 'TABLE', TABLE_ROW: 'TABLE_ROW', TABLE_CELL: 'TABLE_CELL'
+  TABLE: 'TABLE', TABLE_ROW: 'TABLE_ROW', TABLE_CELL: 'TABLE_CELL',
+  HEADER_SECTION: 'HEADER_SECTION', FOOTER_SECTION: 'FOOTER_SECTION'
 };
 
 class Element {
@@ -25,7 +26,8 @@ class Text {
   getTextAttributeIndices() {
     const c = this.p.chars, out = [];
     for (let i = 0; i < c.length; i++) {
-      if (i === 0 || c[i].color !== c[i - 1].color || c[i].bold !== c[i - 1].bold) out.push(i);
+      const a = c[i], b = c[i - 1];
+      if (i === 0 || a.color !== b.color || a.bold !== b.bold || a.bg !== b.bg || a.link !== b.link) out.push(i);
     }
     return out;
   }
@@ -34,6 +36,15 @@ class Text {
   deleteText(s, e) { this.p.chars.splice(s, e - s + 1); return this; }
   setForegroundColor(s, e, color) { for (let i = s; i <= e; i++) this.p.chars[i].color = color; return this; }
   setBold(s, e, bold) { for (let i = s; i <= e; i++) this.p.chars[i].bold = bold; return this; }
+  getBackgroundColor(i) { return this.p.chars[i].bg; }
+  setBackgroundColor(s, e, bg) { for (let i = s; i <= e; i++) this.p.chars[i].bg = bg; return this; }
+  getLinkUrl(i) { return this.p.chars[i].link; }
+  setLinkUrl(s, e, url) { for (let i = s; i <= e; i++) this.p.chars[i].link = url; return this; }
+  insertText(at, str) {
+    const like = this.p.chars[Math.max(0, at - 1)] || { color: null, bold: false, bg: null };
+    this.p.chars.splice(at, 0, ...[...str].map(ch => ({ ch, color: like.color, bold: like.bold, bg: like.bg, link: null })));
+    return this;
+  }
 }
 
 class Paragraph extends Element {
@@ -44,7 +55,7 @@ class Paragraph extends Element {
     this.pageBreak = !!json.pageBreak;
     this.chars = [];
     for (const r of json.runs || []) {
-      for (const ch of r.text) this.chars.push({ ch, color: r.color || null, bold: !!r.bold });
+      for (const ch of r.text) this.chars.push({ ch, color: r.color || null, bold: !!r.bold, bg: r.bg || null, link: null });
     }
   }
   getText() { return this.chars.map(c => c.ch).join(''); }
@@ -61,7 +72,7 @@ class Paragraph extends Element {
     for (let i = matches.length - 1; i >= 0; i--) {
       const m = matches[i];
       const attrs = this.chars[m.index] || { color: null, bold: false };
-      const ins = [...repl].map(ch => ({ ch, color: attrs.color, bold: attrs.bold }));
+      const ins = [...repl].map(ch => ({ ch, color: attrs.color, bold: attrs.bold, bg: attrs.bg, link: null }));
       this.chars.splice(m.index, m[0].length, ...ins);
     }
   }
@@ -106,6 +117,20 @@ class Container extends Element {
     return out;
   }
   getText() { return this.children.map(c => c.getText()).join('\n'); }
+  findText(pattern) {
+    const re = new RegExp(pattern.replace(/^\(\?i\)/, ''), pattern.startsWith('(?i)') ? 'i' : '');
+    for (const p of this.getParagraphs()) {
+      const m = p.getText().match(re);
+      if (m) {
+        return {
+          getElement: () => ({ asText: () => p.editAsText() }),
+          getStartOffset: () => m.index,
+          getEndOffsetInclusive: () => m.index + m[0].length - 1
+        };
+      }
+    }
+    return null;
+  }
   replaceText(pattern, repl) {
     let flags = 'g';
     if (pattern.startsWith('(?i)')) { pattern = pattern.slice(4); flags += 'i'; }
@@ -138,6 +163,7 @@ class Table extends Element {
 }
 
 function bodyFromJson(json) { return new Container(ElementType.BODY_SECTION, json); }
+function footerFromJson(json) { return new Container(ElementType.FOOTER_SECTION, json); }
 
 /** Flat, comparable view of a body: one line per paragraph. */
 function outline(container, prefix = '') {
@@ -151,6 +177,7 @@ function outline(container, prefix = '') {
         empty: !/\S/.test(el.getText()),
         answerColored: el.chars.some(c => c.color === '#0000ff' && /\S/.test(c.ch)),
         bold: el.chars.some(c => c.bold && /\S/.test(c.ch)),
+        highlighted: el.chars.some(c => c.bg),
         list: el.type === ElementType.LIST_ITEM
       });
     }
@@ -158,4 +185,4 @@ function outline(container, prefix = '') {
   return lines;
 }
 
-module.exports = { DocumentApp: { ElementType }, bodyFromJson, outline, Paragraph, Table };
+module.exports = { DocumentApp: { ElementType }, bodyFromJson, footerFromJson, outline, Paragraph, Table };

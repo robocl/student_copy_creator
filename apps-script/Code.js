@@ -42,7 +42,7 @@ function onInstall(e) {
 function menuCreateStudentCopy() {
   var ui = DocumentApp.getUi();
   var result = createStudentCopy(DocumentApp.getActiveDocument().getId());
-  var html = HtmlService.createHtmlOutput(resultHtml(result)).setWidth(420).setHeight(320);
+  var html = HtmlService.createHtmlOutput(resultHtml(result)).setWidth(460).setHeight(440);
   ui.showModalDialog(html, 'Student copy created');
 }
 
@@ -59,6 +59,8 @@ function resultHtml(r) {
     h += '<p><b>Please check:</b></p><ul>' +
       r.warnings.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>';
   }
+  h += '<p><b>Still do by hand:</b></p><ul>' +
+    r.manualChecks.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>';
   return h + '</div>';
 }
 
@@ -77,23 +79,27 @@ function createStudentCopy(teacherDocId) {
   var report = StudentCopy.newReport();
   var bodies = allBodies(doc);
   for (var i = 0; i < bodies.length; i++) StudentCopy.convertBody(bodies[i], null, report);
-  [doc.getHeader(), doc.getFooter()].forEach(function (section) {
-    if (section) section.replaceText(StudentCopy.DEFAULTS.titlePrefixPattern, '');
-  });
+  var sections = headerFooterSections(doc);
+  for (var h = 0; h < sections.length; h++) StudentCopy.convertHeaderFooter(sections[h], report);
   doc.saveAndClose();
-
-  // The cover used the "different first page" footer; the student copy's
-  // first page is a normal page, so turn that off.
-  if (report.removedCover) disableFirstPageHeaderFooter(copy.getId(), report);
 
   return {
     id: copy.getId(),
     url: copy.getUrl(),
     name: name,
     summary: summarize(report),
-    warnings: report.warnings
+    warnings: report.warnings,
+    manualChecks: MANUAL_CHECKS
   };
 }
+
+/** Steps from "HOW TO: Making Student Copies" that still need a person. */
+var MANUAL_CHECKS = [
+  'Page 1 has the large CommonLit logo and the other pages have the small one.',
+  'Answer boxes are a reasonable size (the short response box should run the length of the page).',
+  'No question is split across two pages, and questions still line up with their paragraphs.',
+  'Link the student copy in the Dig Guide (set to "force copy") and in the tracker, then turn the box blue.'
+];
 
 function studentCopyName(name) {
   var n = name.replace(/^Copy of\s+/i, '');
@@ -117,19 +123,20 @@ function allBodies(doc) {
   return bodies.length ? bodies : [doc.getBody()];
 }
 
-function disableFirstPageHeaderFooter(docId, report) {
-  try {
-    Docs.Documents.batchUpdate({
-      requests: [{
-        updateDocumentStyle: {
-          documentStyle: { useFirstPageHeaderFooter: false },
-          fields: 'useFirstPageHeaderFooter'
-        }
-      }]
-    }, docId);
-  } catch (e) {
-    report.warnings.push('Could not reset the first-page footer (' + e.message + '). Check page 1 has the normal footer.');
+/**
+ * Every header and footer, including the separate first-page ones (which
+ * doc.getHeader()/getFooter() don't return).
+ */
+function headerFooterSections(doc) {
+  var out = [];
+  var root = doc.getBody().getParent();
+  for (var i = 0; i < root.getNumChildren(); i++) {
+    var child = root.getChild(i);
+    var type = child.getType();
+    if (type === DocumentApp.ElementType.HEADER_SECTION) out.push(child.asHeaderSection());
+    if (type === DocumentApp.ElementType.FOOTER_SECTION) out.push(child.asFooterSection());
   }
+  return out;
 }
 
 function summarize(r) {
@@ -142,6 +149,11 @@ function summarize(r) {
   add(r.inlineAnswersRemoved, 'inline answer removed', 'inline answers removed');
   add(r.choicesUnmarked, 'highlighted choice un-highlighted', 'highlighted choices un-highlighted');
   add(r.optionalMarkersRemoved, 'optional-question "*" removed', 'optional-question "*" markers removed');
+  add(r.optionalQuestionsRemoved, 'optional (*) question deleted', 'optional (*) questions deleted');
+  add(r.teacherBoxesRemoved, '"Notes to Teacher" box deleted', '"Notes to Teacher" boxes deleted');
+  add(r.highlightsRemoved, 'highlight removed', 'highlights removed');
+  add(r.headerLabelsChanged, 'header changed to "Student Copy"', 'headers changed to "Student Copy"');
+  add(r.footerLinesReplaced, 'footer copyright line changed to the CC BY-NC-SA line', 'footer copyright lines changed to the CC BY-NC-SA line');
   if (!out.length) out.push('No changes were needed.');
   return out;
 }

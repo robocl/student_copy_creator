@@ -1,100 +1,82 @@
 # Student Copy Creator
 
-Turns a CommonLit **teacher copy** Google Doc into a **student copy** in one step.
+Turns a CommonLit **teacher copy** Google Doc into a **student copy** in one click.
 
-A curriculum writer pastes a teacher-copy link into a small internal web page. They get back a link to a new student copy in the same Drive folder. The teacher copy is never modified.
+A curriculum writer opens a simple internal web page, pastes the teacher copy's link, and clicks a button. A few seconds later they get a link to the new student copy. It's saved in the same Drive folder, and the teacher copy is never changed.
 
-## What it changes
+It follows the "HOW TO: Making Student Copies for a 360 Unit" guide.
 
-| Teacher copy | Student copy |
-| --- | --- |
-| Cover pages (Lesson Overview, pacing, notes to teachers): everything before the first **Name / Class** table | Removed |
-| `TEACHER COPY: Button, Button` | `Button, Button` |
-| `*Answers in blue…*` and blue `Note: To ensure test security…` lines | Removed |
-| Blue answers (paragraphs or bullets) | Replaced with blank writing lines |
-| Blue answer text at the end of a question line | Removed, question kept |
-| A blue (bold) option in a list of black options, e.g. the correct "This claim just restates the prompt." | Kept, set back to plain black text |
-| `*A. Find Evidence…` (optional-question asterisk) | `A. Find Evidence…` |
-| File name `…TEACHER_COPY…` | `…STUDENT_COPY…` |
-| "Different first page" footer (used by the cover) | Turned off |
+## What it does
 
-The result card also lists **warnings** to check by hand, for example blue text that is still there, the word "teacher" still appearing, or no Name table found.
+**Done for you**
 
-### What writers need to keep doing
+- Makes a copy **without comments** and names it correctly: removes "Copy of", changes TEACHER to STUDENT, and keeps the lesson number and the Ed2.0 ending.
+- Saves it in the same folder as the teacher copy.
+- Deletes the teacher cover page(s): everything before the **Name / Class** box.
+- Header: "Teacher Copy" → "Student Copy" (on page 1 and on the other pages).
+- Footer: "© CommonLit, Inc. 2026" → "Unless otherwise noted, this content is licensed under the CC BY-NC-SA 4.0 license." with the link.
+- Keeps the big logo on page 1 and the small logo on the other pages.
+- Removes "TEACHER COPY:" from the title on page 1.
+- Deletes blue answers and leaves blank lines for students to write in.
+- When the correct choice is marked in blue among black options, it keeps the option but makes it plain black text.
+- Deletes the "Answers in blue…" line and the blue "Note: To ensure test security…" notes.
+- **Fully deletes optional (\*) questions**, along with their answer choices and answers.
+- Deletes "Notes to Teacher" boxes.
+- Removes all highlights.
 
-The tool depends on the conventions already used in the Ed2.0 docs:
+**Still done by a person** (the tool lists these every time)
 
-1. Answers are colored exactly **#0000FF** (Google Docs "blue" in the custom color picker). Other blues are left alone.
-2. The student-facing part starts with the **Name / Class** table.
-3. Teacher-only notes sit in their own paragraph.
+- Check page 1 has the large logo and the other pages have the small one.
+- Check answer boxes are a reasonable size (short response box = length of the page).
+- Check no question is split across two pages, and questions still line up with their paragraphs.
+- Link it in the Dig Guide (force copy) and the tracker, and turn the box blue.
 
-## Why Google Apps Script
+The tool also lists anything it wasn't sure about under **Please check**, for example blue text it couldn't place, or each optional question it deleted.
 
-- It edits the Google Doc directly. There's no export/import round trip, so fonts, tables, images, headers, and footers come through untouched.
-- Nothing to host or pay for. It runs under each writer's own Google account, so the copy gets the writer's normal Drive permissions.
-- The same code powers the web page and (optionally) a menu item inside Google Docs.
+**It depends on writers keeping to these habits:** answers are exactly the standard blue (#0000FF), the student part starts with the Name / Class box, and teacher notes sit in their own paragraph or box.
 
-## Setup (one-time, ~10 minutes)
+## Setup (one time, about 10 minutes, no coding)
 
-You need a CommonLit Google account.
+One person does this once. Everyone else just uses the link it produces.
 
-### Option A: copy and paste (no tools needed)
+1. Go to **script.google.com** while signed in to your CommonLit Google account. Click **New project**.
+2. Click **Untitled project** at the top and rename it **Student Copy Creator**.
+3. You'll see a file called **Code.gs** with a few lines in it. Delete those lines. Paste in everything from [`paste-into-google/Code.gs`](paste-into-google/Code.gs). On GitHub, the "Copy raw file" button copies it all.
+4. Click the **+** next to "Files" → **HTML**. Name it `Index` (Google adds the `.html`). Delete what's in it and paste in everything from [`paste-into-google/Index.html`](paste-into-google/Index.html).
+5. Click the 💾 **Save** icon.
+6. Click the blue **Deploy** button (top right) → **New deployment**. Click the ⚙️ next to "Select type" → **Web app**. Fill in:
+   - **Execute as:** *User accessing the web app*
+   - **Who has access:** *Anyone within CommonLit*
 
-1. Go to <https://script.google.com> and click **New project**. Name it "Student Copy Creator".
-2. Create these files and paste in the contents from `apps-script/`:
-   - `Code.gs` ← `apps-script/Code.js`
-   - `Converter.gs` ← `apps-script/Converter.js`
-   - `Index.html` ← `apps-script/Index.html` (**File > New > HTML**, name it `Index`)
-3. **Project Settings** (gear) → check **Show "appsscript.json" manifest file in editor**. Then replace its contents with `apps-script/appsscript.json`.
-4. **Services (+)** → add **Google Docs API**. This is used only to turn off the first-page footer.
-5. **Deploy > New deployment** → type **Web app**:
-   - *Execute as:* **User accessing the web app**
-   - *Who has access:* **Anyone within CommonLit**
-6. Share the web app URL with the curriculum team. On first use, each person clicks through a Google permission screen.
+   Then click **Deploy**.
+7. Google asks you to **Authorize access**. Pick your account. You may see a "Google hasn't verified this app" screen, which is normal for internal tools. Click **Advanced → Go to Student Copy Creator**, then **Allow**. The tool needs to read and copy Docs in your Drive.
+8. Copy the **Web app URL** it shows you. That's the tool. Bookmark it and share it with the curriculum team. Each person sees the same permission screen the first time they use it.
 
-### Option B: from this repo with `clasp`
+**Try it first on a test copy.** Make a copy of a teacher copy (like Katie's test copy) and run the tool on that before using real lessons.
 
-```bash
-npm install -g @google/clasp
-clasp login
-clasp create --type standalone --title "Student Copy Creator" --rootDir apps-script
-clasp push
-clasp deploy --description "v1"
-```
+### Updating it later
 
-Then open the project (`clasp open`) and do step 5 above once so it's deployed as a web app. To ship updates later, run `npm run deploy`, or in the editor use **Deploy > Manage deployments > Edit > New version**.
+If the rules change, paste the new `Code.gs` over the old one and save. Then go to **Deploy → Manage deployments → ✏️ (edit) → Version: New version → Deploy**. The link stays the same.
 
-### Optional: a menu inside Google Docs
+### Optional: a button inside Google Docs
 
-`Code.js` also adds **Extensions → Student Copy Creator → Create student copy** when the script runs as a Docs add-on. Two ways to get that:
-
-- **One writer, quick:** open any doc → **Extensions > Apps Script**, paste the same files, save, reload the doc. This only works in that doc.
-- **Whole team:** publish it as a private Google Workspace **Editor add-on** for the CommonLit domain. This needs a Google Cloud project with the *Google Workspace Marketplace SDK*, plus a Workspace admin to install it for the curriculum team. Worth doing once the web app has proven the rules.
+The same code can add a menu inside every Google Doc: **Extensions → Student Copy Creator → Create student copy**. For the whole team, it has to be published as a private "Google Workspace add-on", which a Google Workspace admin at CommonLit needs to help with. Worth doing once the web page version has proven itself.
 
 ## Using it
 
-1. Open the web app URL.
-2. Paste one or more teacher-copy links, one per line.
-3. Click **Create student copy** and open the link it returns. Skim it, especially anything listed under *Please check*.
+1. Resolve comments and make sure copy-editing feedback is in (step 1 of the how-to). Suggested edits should be accepted or rejected first.
+2. Open the tool's link, paste one or more teacher copy links (one per line), and click **Create student copy**.
+3. Open the new doc and work through **Please check** and **Still do by hand**.
 
-If the teacher copy is a `.docx` in Drive, open it and use **File > Save as Google Docs** first.
+If the teacher copy is a Word file (.docx) in Drive, open it and use **File → Save as Google Docs** first.
 
-## Tuning
+---
 
-Options live in `DEFAULTS` at the top of `apps-script/Converter.js`:
+## For developers
 
-- `answerColors`: colors treated as answers (default `#0000ff`).
-- `teacherOnlyPatterns`: paragraphs matching these are deleted.
-- `minAnswerLines` / `maxAnswerLines` / `charsPerAnswerLine`: how much blank writing space replaces an answer.
+- `apps-script/`: the source. `Converter.js` holds the conversion rules (settings are in `DEFAULTS` at the top, e.g. `optionalQuestions: 'unmark'` keeps optional questions but drops the `*`). `Code.js` holds the web app, Drive copy, and header/footer handling. `Index.html` is the page.
+- `paste-into-google/`: the same code bundled into two files for copy and paste. Regenerate it with `npm run build`. A test fails if you forget.
+- `npm test` runs the rules against a mock of Google's DocumentApp (`test/mock-docs.js`). You can add golden tests from real teacher/student pairs with `test/docx_to_json.py` (see `test/fixtures/README.md`). Fixtures are git-ignored because teacher copies contain answer keys.
+- You can also deploy with [clasp](https://github.com/google/clasp) (`.clasp.json.example`, `npm run deploy`) instead of copying and pasting.
 
-## Tests
-
-The conversion rules run in Node against a mock of the DocumentApp API (`test/mock-docs.js`):
-
-```bash
-npm test
-```
-
-You can also run golden tests against real teacher/student pairs. Export both docs as .docx, convert them with `test/docx_to_json.py`, and drop the JSON into `test/fixtures/` (see the README there). Fixtures are git-ignored because teacher copies contain answer keys. "Writing a Strong Claim" (8G Unit 1) matches the published student copy line for line. The only difference is the number of blank writing lines.
-
-The mock only follows Google's documented behavior. Real-Doc quirks will only show up by running the tool on real teacher copies.
+The mock only follows Google's documentation. Real-Doc quirks will only show up by running the tool on real teacher copies.
