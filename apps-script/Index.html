@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    :root { --ink:#1d1c1d; --muted:#5f6368; --line:#dadce0; --accent:#1a73e8; --warn:#b06000; --bg:#fff; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 Arial, Helvetica, sans-serif; }
+    main { max-width:640px; margin:48px auto; padding:0 16px; }
+    h1 { font-size:24px; margin:0 0 4px; }
+    p.sub { color:var(--muted); margin:0 0 24px; }
+    label { font-weight:bold; display:block; margin-bottom:6px; }
+    textarea { width:100%; min-height:88px; padding:10px; font:inherit; border:1px solid var(--line); border-radius:6px; resize:vertical; }
+    button { margin-top:12px; padding:10px 18px; font:inherit; font-weight:bold; color:#fff; background:var(--accent); border:0; border-radius:6px; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:default; }
+    .result { margin-top:24px; padding:14px 16px; border:1px solid var(--line); border-radius:8px; }
+    .result a { color:var(--accent); font-weight:bold; word-break:break-word; }
+    .result ul { margin:8px 0 0; padding-left:20px; }
+    .warn { color:var(--warn); }
+    .error { color:#c5221f; }
+    .hint { color:var(--muted); font-size:13px; margin-top:24px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Student Copy Creator</h1>
+  <p class="sub">Paste a teacher copy Google Doc link. You get a new student copy in the same folder. The teacher copy is not changed.</p>
+
+  <label for="links">Teacher copy link(s), one per line</label>
+  <textarea id="links" placeholder="https://docs.google.com/document/d/..."></textarea>
+  <button id="go">Create student copy</button>
+
+  <div id="results"></div>
+
+  <p class="hint">What it does: removes the cover pages, the "TEACHER COPY" label, and the "Answers in blue" and test-security notes. Blue answers become blank writing lines. The correct choice in a blue-marked list goes back to plain text. The "*" on optional questions is removed. Always skim the result before you share it.</p>
+</main>
+<script>
+  var go = document.getElementById('go');
+  var results = document.getElementById('results');
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function list(items, cls) {
+    return '<ul' + (cls ? ' class="' + cls + '"' : '') + '>' +
+      items.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>';
+  }
+
+  function card(html) {
+    var div = document.createElement('div');
+    div.className = 'result';
+    div.innerHTML = html;
+    results.appendChild(div);
+    return div;
+  }
+
+  go.addEventListener('click', function () {
+    var links = document.getElementById('links').value.split(/\s+/).filter(Boolean);
+    if (!links.length) return;
+    results.innerHTML = '';
+    go.disabled = true;
+    var left = links.length;
+    var done = function () { if (--left === 0) go.disabled = false; };
+
+    links.forEach(function (link) {
+      var c = card('Converting ' + esc(link) + '…');
+      google.script.run
+        .withSuccessHandler(function (r) {
+          c.innerHTML = '<a href="' + esc(r.url) + '" target="_blank">' + esc(r.name) + '</a>' +
+            list(r.summary) +
+            (r.warnings.length ? '<div class="warn"><b>Please check:</b>' + list(r.warnings) + '</div>' : '');
+          done();
+        })
+        .withFailureHandler(function (e) {
+          c.innerHTML = '<span class="error">' + esc(link) + ': ' + esc(e.message || e) + '</span>';
+          done();
+        })
+        .convertFromUrl(link);
+    });
+  });
+</script>
+</body>
+</html>

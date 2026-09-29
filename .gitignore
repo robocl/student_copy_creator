@@ -1,0 +1,8 @@
+node_modules/
+.clasp.json
+.clasprc.json
+# Teacher copies contain answer keys; keep them out of git.
+test/fixtures/*
+!test/fixtures/README.md
+*.docx
+*.pdf

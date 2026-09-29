@@ -1,0 +1,10 @@
+{
+  "name": "student-copy-creator",
+  "private": true,
+  "description": "Turns CommonLit teacher-copy Google Docs into student copies (Google Apps Script).",
+  "scripts": {
+    "test": "node --test test/converter.test.js",
+    "push": "clasp push",
+    "deploy": "clasp push && clasp deploy"
+  }
+}
