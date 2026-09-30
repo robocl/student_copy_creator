@@ -22,6 +22,25 @@ function convert(json) {
   return { body, report, lines: mock.outline(body) };
 }
 
+test('removes cover pages before a typed "Name: ___ Class: ___" line', () => {
+  const { lines, report } = convert([
+    p('Lesson Overview: Planning Your Literary Analysis Essay'), table([[p('Skill Focus')]]), p(''),
+    p('Name: ________________          Class: ________________'), p('Planning Your Literary Analysis Essay')
+  ]);
+  assert.deepStrictEqual(lines.map(l => l.text), ['Name: ________________          Class: ________________', 'Planning Your Literary Analysis Essay']);
+  assert.ok(report.removedCover);
+});
+
+test('keeps the teacher copy spacing: a two-line answer beside a question becomes two blank lines', () => {
+  const answer = 'She thinks Mr. Steward is just trying to sell her something and is offended.'; // 77 chars = 2 lines at 60
+  const { lines } = convert([
+    p(''), nameTable,
+    table([[p('Story paragraph')], [p('Paragraph 12'), p('Think and Share: How does Norma react?'), li(answer, 0, { color: BLUE }), p('Paragraph 14')]])
+  ]);
+  const cell = lines.slice(5).filter(l => l.text.startsWith('[0,1]')).map(l => l.text);
+  assert.deepStrictEqual(cell, ['[0,1] Paragraph 12', '[0,1] Think and Share: How does Norma react?', '[0,1] ', '[0,1] ', '[0,1] Paragraph 14']);
+});
+
 test('removes cover pages before the Name table and keeps one empty paragraph', () => {
   const { lines, report } = convert([
     p('LESSON OVERVIEW: BUTTON'), p('(This page does not appear on the student copy.)'),
@@ -88,7 +107,9 @@ test('removes inline blue answers but keeps the question', () => {
     p(''), nameTable,
     runs(['How do their reactions impact the reader? ', null], ['They build tension.', BLUE])
   ]);
-  assert.strictEqual(lines[lines.length - 1].text, 'How do their reactions impact the reader? ');
+  const q = lines.findIndex(l => l.text === 'How do their reactions impact the reader? ');
+  assert.ok(q >= 0, 'question kept, answer gone');
+  assert.ok(lines[q + 1] && lines[q + 1].empty, 'the line the answer wrapped onto stays as blank space');
 });
 
 test('deletes optional (*) questions with their options and answers, but not *** dividers', () => {

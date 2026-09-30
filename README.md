@@ -13,12 +13,12 @@ The tool comes in two forms. Both use the same rules:
 
 - Makes a copy **without comments** and names it correctly: removes "Copy of", changes TEACHER to STUDENT, and keeps the lesson number and the Ed2.0 ending.
 - Saves it in the same folder as the teacher copy.
-- Deletes the teacher cover page(s): everything before the **Name / Class** box.
+- Deletes the teacher cover page(s): everything before the **Name / Class** box or the typed "Name: ___ Class: ___" line.
 - Header: "Teacher Copy" → "Student Copy" (on page 1 and on the other pages).
 - Footer: "© CommonLit, Inc. 2026" → "Unless otherwise noted, this content is licensed under the CC BY-NC-SA 4.0 license." with the link.
-- Keeps the big logo on page 1 and the small logo on the other pages.
+- Logos: page 1 gets the large logo and the other pages keep the small one. The web page moves the cover page's large-logo header onto page 1 automatically. The Google Docs version can't yet, so check it by hand there.
 - Removes "TEACHER COPY:" from the title on page 1.
-- Deletes blue answers and leaves blank lines for students to write in.
+- Deletes blue answers and leaves the same amount of blank space the answer took up, so questions stay lined up with their paragraphs as in the teacher copy. A box that held only an answer gets at least 3 lines.
 - When the correct choice is marked in blue among black options, it keeps the option but makes it plain black text.
 - Deletes the "Answers in blue…" line and the blue "Note: To ensure test security…" notes.
 - **Fully deletes optional (\*) questions**, along with their answer choices and answers.

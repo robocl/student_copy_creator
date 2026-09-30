@@ -5,7 +5,7 @@
 
 /** "Copy of 04. X TEACHER COPY Ed2.0" -> "04. X STUDENT COPY Ed2.0" */
 function studentCopyName(name) {
-  var n = name.replace(/^Copy of\s+/i, '');
+  var n = name.replace(/^Copy[ _]of[ _]+/i, '');
   var out = n.replace(/TEACHER([ _-])COPY/i, function (m, sep) {
     return m === m.toUpperCase() ? 'STUDENT' + sep + 'COPY' : 'Student' + sep + 'Copy';
   });

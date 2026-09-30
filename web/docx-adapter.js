@@ -20,6 +20,9 @@ var DocxStudentCopy = (function () {
     PARAGRAPH: 'PARAGRAPH', LIST_ITEM: 'LIST_ITEM', TABLE: 'TABLE', TABLE_ROW: 'TABLE_ROW', TABLE_CELL: 'TABLE_CELL'
   };
 
+  var ATTRIBUTE = { FONT_SIZE: 'FONT_SIZE', SPACING_BEFORE: 'SPACING_BEFORE', SPACING_AFTER: 'SPACING_AFTER',
+    LINE_SPACING: 'LINE_SPACING', INDENT_START: 'INDENT_START' };
+
   // Schema order of <w:rPr> children; Word rejects files that break it.
   var RPR_ORDER = ['rStyle', 'rFonts', 'b', 'bCs', 'i', 'iCs', 'caps', 'smallCaps', 'strike', 'dstrike',
     'outline', 'shadow', 'emboss', 'imprint', 'noProof', 'snapToGrid', 'vanish', 'webHidden', 'color',
@@ -153,7 +156,33 @@ var DocxStudentCopy = (function () {
   Container.prototype.getNumChildren = function () { return this.kids().length; };
   Container.prototype.getChild = function (i) { return wrap(this.kids()[i], this.ctx); };
   Container.prototype.getChildIndex = function (child) { return this.kids().indexOf(child.node); };
-  Container.prototype.removeChild = function (child) { this.node.removeChild(child.node); return this; };
+  Container.prototype.removeChild = function (child) {
+    noteSectionBreak(child.node, this.ctx);
+    this.node.removeChild(child.node);
+    return this;
+  };
+  // Width and padding in points, like DocumentApp's TableCell / Body.
+  Container.prototype.getWidth = function () {
+    if (!isW(this.node, 'tc')) return null;
+    var tcPr = firstW(this.node, 'tcPr'), tcW = tcPr && firstW(tcPr, 'tcW');
+    var w = tcW && wAttr(tcW, 'type') !== 'pct' ? parseFloat(wAttr(tcW, 'w')) : NaN;
+    if (!isNaN(w) && w > 0) return w / 20;
+    // Fall back to the table grid column.
+    var tr = this.node.parentNode, tbl = tr && tr.parentNode;
+    var grid = tbl && firstW(tbl, 'tblGrid');
+    var col = grid && kidsW(grid, 'gridCol')[kidsW(tr, 'tc').indexOf(this.node)];
+    var g = col ? parseFloat(wAttr(col, 'w')) : NaN;
+    return !isNaN(g) && g > 0 ? g / 20 : null;
+  };
+  Container.prototype.getPaddingLeft = Container.prototype.getPaddingRight = function () { return 5.4; };
+  Container.prototype.pageSetting = function (tag, attr) {
+    var sect = descendantsW(this.node, 'sectPr').pop();
+    var v = sect && wAttr(firstW(sect, tag), attr);
+    return v ? parseFloat(v) / 20 : null;
+  };
+  Container.prototype.getPageWidth = function () { return isW(this.node, 'body') ? this.pageSetting('pgSz', 'w') : null; };
+  Container.prototype.getMarginLeft = function () { return this.pageSetting('pgMar', 'left') || 0; };
+  Container.prototype.getMarginRight = function () { return this.pageSetting('pgMar', 'right') || 0; };
   Container.prototype.insertParagraph = function (i, text) {
     var p = el(this.ctx, 'p');
     if (text) {
@@ -234,11 +263,60 @@ var DocxStudentCopy = (function () {
   Para.prototype.getText = function () { return this.runs().map(runText).join(''); };
   Para.prototype.editAsText = function () { return new Text(this); };
   Para.prototype.clear = function () {
+    // A cleared paragraph also loses its section break (the cover's section).
+    var pPr0 = firstW(this.node, 'pPr'), sect = pPr0 && firstW(pPr0, 'sectPr');
+    if (sect) { noteSectionBreak(this.node, this.ctx); pPr0.removeChild(sect); }
     var pPr = firstW(this.node, 'pPr');
     var kill = [];
     for (var c = this.node.firstChild; c; c = c.nextSibling) if (c !== pPr) kill.push(c);
     var node = this.node;
     kill.forEach(function (c) { node.removeChild(c); });
+    return this;
+  };
+  /** FONT_SIZE, SPACING_BEFORE/AFTER, LINE_SPACING, INDENT_START (points), like DocumentApp. */
+  Para.prototype.getAttributes = function () {
+    var pPr = firstW(this.node, 'pPr');
+    var attrs = {};
+    var sp = pPr && firstW(pPr, 'spacing');
+    if (sp) {
+      var b = wAttr(sp, 'before'), a = wAttr(sp, 'after'), l = wAttr(sp, 'line'), rule = wAttr(sp, 'lineRule');
+      if (b != null) attrs.SPACING_BEFORE = parseFloat(b) / 20;
+      if (a != null) attrs.SPACING_AFTER = parseFloat(a) / 20;
+      if (l != null && (!rule || rule === 'auto')) attrs.LINE_SPACING = parseFloat(l) / 240;
+    }
+    var ind = pPr && firstW(pPr, 'ind');
+    var left = ind && (wAttr(ind, 'left') || wAttr(ind, 'start'));
+    if (left) attrs.INDENT_START = parseFloat(left) / 20;
+    var r = this.runs().filter(function (x) { return runText(x).length; })[0];
+    var sz = r && firstW(r, 'rPr') && wAttr(firstW(firstW(r, 'rPr'), 'sz'), 'val');
+    if (!sz && pPr && firstW(pPr, 'rPr')) sz = wAttr(firstW(firstW(pPr, 'rPr'), 'sz'), 'val');
+    if (sz) attrs.FONT_SIZE = parseFloat(sz) / 2;
+    return attrs;
+  };
+  /** Applies the same attributes to this (usually empty) paragraph. */
+  Para.prototype.setAttributes = function (attrs) {
+    var ctx = this.ctx;
+    var pPr = firstW(this.node, 'pPr');
+    if (!pPr) { pPr = el(ctx, 'pPr'); this.node.insertBefore(pPr, this.node.firstChild); }
+    if (attrs.SPACING_BEFORE != null || attrs.SPACING_AFTER != null || attrs.LINE_SPACING != null) {
+      var sp = el(ctx, 'spacing');
+      if (attrs.SPACING_BEFORE != null) sp.setAttributeNS(W, 'w:before', String(Math.round(attrs.SPACING_BEFORE * 20)));
+      if (attrs.SPACING_AFTER != null) sp.setAttributeNS(W, 'w:after', String(Math.round(attrs.SPACING_AFTER * 20)));
+      if (attrs.LINE_SPACING != null) {
+        sp.setAttributeNS(W, 'w:line', String(Math.round(attrs.LINE_SPACING * 240)));
+        sp.setAttributeNS(W, 'w:lineRule', 'auto');
+      }
+      kidsW(pPr, 'spacing').forEach(function (x) { pPr.removeChild(x); });
+      pPr.insertBefore(sp, firstW(pPr, 'ind') || firstW(pPr, 'jc') || firstW(pPr, 'rPr') || null);
+    }
+    if (attrs.FONT_SIZE != null) {
+      var rPr = firstW(pPr, 'rPr');
+      if (!rPr) { rPr = el(ctx, 'rPr'); pPr.appendChild(rPr); }
+      var half = String(Math.round(attrs.FONT_SIZE * 2));
+      kidsW(rPr, 'sz').concat(kidsW(rPr, 'szCs')).forEach(function (x) { rPr.removeChild(x); });
+      rPr.appendChild(el(ctx, 'sz', { val: half }));
+      rPr.appendChild(el(ctx, 'szCs', { val: half }));
+    }
     return this;
   };
   Para.prototype.replaceText = function (re, repl) {
@@ -284,6 +362,11 @@ var DocxStudentCopy = (function () {
     var r = this.runAt(off), rPr = r && firstW(r, 'rPr');
     var v = rPr && wAttr(firstW(rPr, 'color'), 'val');
     return v && v !== 'auto' ? '#' + v.toLowerCase() : null;
+  };
+  Text.prototype.getFontSize = function (off) {
+    var r = this.runAt(off), rPr = r && firstW(r, 'rPr');
+    var sz = rPr && wAttr(firstW(rPr, 'sz'), 'val');
+    return sz ? parseFloat(sz) / 2 : null;
   };
   Text.prototype.isBold = function (off) {
     var r = this.runAt(off), rPr = r && firstW(r, 'rPr');
@@ -465,6 +548,66 @@ var DocxStudentCopy = (function () {
     });
   };
 
+  /** Remembers a section break that goes away with a removed paragraph. */
+  function noteSectionBreak(node, ctx) {
+    if (!ctx.removedSections) return;
+    var list = isW(node, 'sectPr') ? [node] : descendantsW(node, 'sectPr');
+    list.forEach(function (s) { if (ctx.removedSections.indexOf(s) < 0) ctx.removedSections.push(s); });
+  }
+
+  var SECT_REF_TAGS = ['headerReference', 'footerReference'];
+  var SECT_AFTER_TITLEPG = ['textDirection', 'bidi', 'rtlGutter', 'docGrid', 'printerSettings', 'sectPrChange'];
+
+  function refOf(sect, tag, type) {
+    return kidsW(sect, tag).filter(function (r) { return (wAttr(r, 'type') || 'default') === type; })[0] || null;
+  }
+
+  /**
+   * The cover page lives in its own section whose "different first page"
+   * header holds the large logo. Deleting the cover deletes that section, so
+   * hand its headers to the first remaining section and turn on "different
+   * first page" there: page 1 gets the large logo, later pages the small one.
+   * Returns true if it changed anything.
+   */
+  function carryCoverHeaders(body, removedSections, order) {
+    if (!removedSections.length) return false;
+    var cover = removedSections.slice().sort(function (a, b) { return order.indexOf(b) - order.indexOf(a); })[0];
+    var target = descendantsW(body, 'sectPr')[0];
+    if (!cover || !target) return false;
+    var xml = body.ownerDocument;
+    var changed = false;
+    var firstNonRef = function () {
+      for (var c = target.firstChild; c; c = c.nextSibling) {
+        if (isW(c) && SECT_REF_TAGS.indexOf(c.localName) < 0) return c;
+      }
+      return null;
+    };
+    [['headerReference', 'default'], ['headerReference', 'first'], ['footerReference', 'default']].forEach(function (pair) {
+      var have = refOf(target, pair[0], pair[1]);
+      var from = refOf(cover, pair[0], pair[1]);
+      if (!have && from) { target.insertBefore(from.cloneNode(true), firstNonRef()); changed = true; }
+    });
+    if (!refOf(target, 'footerReference', 'first')) {
+      // Page 1 uses the same footer (and page number) as the other pages.
+      var def = refOf(target, 'footerReference', 'default');
+      if (def) {
+        var f = def.cloneNode(true);
+        f.setAttributeNS(W, 'w:type', 'first');
+        target.insertBefore(f, firstNonRef());
+        changed = true;
+      }
+    }
+    if (refOf(target, 'headerReference', 'first') && !firstW(target, 'titlePg')) {
+      var before = null;
+      for (var c = target.firstChild; c; c = c.nextSibling) {
+        if (isW(c) && SECT_AFTER_TITLEPG.indexOf(c.localName) >= 0) { before = c; break; }
+      }
+      target.insertBefore(xml.createElementNS(W, 'w:titlePg'), before);
+      changed = true;
+    }
+    return changed;
+  }
+
   function makeCtx(xml, relsXml) {
     var n = 0;
     return {
@@ -542,9 +685,18 @@ var DocxStudentCopy = (function () {
             report.warnings.push('The file has suggested edits (tracked changes). Accept or reject them in the teacher copy, then download it again.');
           }
           splitRuns(docXml);
+          var bodyNode = firstW(docXml.documentElement, 'body');
+          var ctx = makeCtx(docXml, relsXml);
+          ctx.removedSections = [];
+          var sectionOrder = descendantsW(bodyNode, 'sectPr');
           withDocumentApp(function () {
-            rules.convertBody(new Container(firstW(docXml.documentElement, 'body'), makeCtx(docXml, relsXml)), options, report);
+            rules.convertBody(new Container(bodyNode, ctx), options, report);
           });
+          if (report.removedCover && carryCoverHeaders(bodyNode, ctx.removedSections, sectionOrder)) {
+            report.logoFixed = true;
+          }
+          var first = descendantsW(bodyNode, 'sectPr')[0];
+          report.firstPageHeaderOk = !!(first && firstW(first, 'titlePg') && refOf(first, 'headerReference', 'first'));
           var hf = docRels.list.filter(function (r) { return /\/(header|footer)$/.test(r.type); });
           return Promise.all(hf.map(function (rel) {
             var path = 'word/' + rel.target.replace(/^\/?word\//, '');
@@ -564,13 +716,17 @@ var DocxStudentCopy = (function () {
     }).then(function (data) {
       var base = String(fileName || 'Teacher copy').replace(/\.docx$/i, '');
       var summary = names.summarize(report);
+      if (report.logoFixed) summary.push('Page 1 set to use the large logo; later pages keep the small one');
       if (report.commentsRemoved) summary.push('Comments removed');
       return {
         data: data,
         name: names.studentCopyName(base) + '.docx',
         summary: summary,
         warnings: report.warnings,
-        manualChecks: names.MANUAL_CHECKS
+        // The logo check is only needed when page 1 has no first-page header of its own.
+        manualChecks: names.MANUAL_CHECKS.filter(function (c) {
+          return !(report.removedCover && report.firstPageHeaderOk) || !/logo/i.test(c);
+        })
       };
     });
 
@@ -578,7 +734,7 @@ var DocxStudentCopy = (function () {
     function withDocumentApp(fn) {
       var g = typeof globalThis !== 'undefined' ? globalThis : window;
       var had = 'DocumentApp' in g, old = g.DocumentApp;
-      g.DocumentApp = { ElementType: ET };
+      g.DocumentApp = { ElementType: ET, Attribute: ATTRIBUTE };
       try { fn(); } finally { if (had) g.DocumentApp = old; else delete g.DocumentApp; }
     }
   }

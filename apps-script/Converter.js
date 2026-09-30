@@ -26,7 +26,7 @@ var StudentCopy = (function () {
     answerColors: ['#0000ff'],
     // Whole paragraphs matching any of these are deleted.
     teacherOnlyPatterns: [
-      /answers in blue/i,
+      /answers (are )?in blue/i,
       /to ensure (test|assessment) security/i,
       /this page does not appear on the student copy/i
     ],
@@ -39,10 +39,12 @@ var StudentCopy = (function () {
     // 'delete' removes optional questions (the how-to); 'unmark' just drops the "*".
     optionalQuestions: 'delete',
     removeHighlights: true,
-    // Writing space left in place of a blanked answer.
+    // Blanked answers keep the teacher copy's spacing: each answer becomes as
+    // many empty lines as it filled. A box that held only an answer gets at
+    // least minAnswerLines. charsPerAnswerLine is used when the line width
+    // can't be read from the document.
     charsPerAnswerLine: 60,
-    minAnswerLines: 5,
-    maxAnswerLines: 12
+    minAnswerLines: 3
   };
 
   var T = function () { return DocumentApp.ElementType; };
@@ -98,17 +100,35 @@ var StudentCopy = (function () {
     return /^\s*name\b/i.test(t.getCell(0, 0).getText());
   }
 
+  // "Name: ________   Class: ________" typed as a line (newer templates).
+  function isNameLine(el) {
+    if (el.getType() !== T().PARAGRAPH && el.getType() !== T().LIST_ITEM) return false;
+    var text = el.getText();
+    return /^\s*name\s*:?\s*_{3,}/i.test(text) || /^\s*name\s*:.*\bclass\s*:/i.test(text);
+  }
+
   function removeCoverPages(body, report) {
     var n = body.getNumChildren();
     var idx = -1;
+    var line = false;
     for (var i = 0; i < n; i++) {
-      if (isNameTable(body.getChild(i))) { idx = i; break; }
+      var child = body.getChild(i);
+      if (isNameTable(child)) { idx = i; break; }
+      if (isNameLine(child)) { idx = i; line = true; break; }
     }
     if (idx < 0) {
-      report.warnings.push('Could not find the "Name / Class" table, so no cover pages were removed.');
+      report.warnings.push('Could not find the "Name / Class" line where the student part starts, so the cover page was not removed. Delete it by hand.');
       return;
     }
     if (idx === 0) return;
+    if (line) {
+      for (var k = idx - 1; k >= 0; k--) {
+        body.removeChild(body.getChild(k));
+        report.coverElementsRemoved++;
+      }
+      report.removedCover = true;
+      return;
+    }
     // Google Docs needs a paragraph before a leading table, so keep the
     // element directly before the Name table but empty it (it usually holds
     // the page break that ended the cover).
@@ -236,11 +256,19 @@ var StudentCopy = (function () {
       }
     }
 
+    // Edits that add or remove paragraphs run afterwards, back to front.
+    var ops = [];
+    var width = null, widthRead = false;
+    var getWidth = function () { if (!widthRead) { width = lineWidth(container); widthRead = true; } return width; };
     for (var a = 0; a < kids.length; a++) {
       var k = kids[a];
       if (!k) continue;
       if (k.kind === 'partial') {
+        var fmtP = lineFormat(k.el);
+        var before = estimateLines(k.text, fmtP, getWidth(), o);
         removeInlineAnswers(k.el, o);
+        var extra = before - estimateLines(k.el.getText(), fmtP, getWidth(), o);
+        if (extra > 0) ops.push({ at: a, extra: extra, fmt: fmtP });
         report.inlineAnswersRemoved++;
       } else if (k.kind === 'full') {
         var sib = choiceSibling(kids, a);
@@ -270,10 +298,16 @@ var StudentCopy = (function () {
     }
     if (cur) blocks.push(cur);
 
-    for (var x = blocks.length - 1; x >= 0; x--) {
-      blankAnswerBlock(container, blocks[x], kids, o);
-      report.answersBlanked++;
-    }
+    blocks.forEach(function (block) { ops.push({ at: block[0], block: block }); report.answersBlanked++; });
+    ops.sort(function (p, q) { return q.at - p.at; });
+    ops.forEach(function (op) {
+      if (op.block) {
+        blankAnswerBlock(container, op.block, kids, o);
+      } else {
+        // Keep the lines the erased answer used to wrap onto.
+        for (var n = 0; n < op.extra; n++) applyFormat(container.insertParagraph(op.at + 1, ''), op.fmt);
+      }
+    });
   }
 
   function removeInlineAnswers(para, o) {
@@ -321,18 +355,86 @@ var StudentCopy = (function () {
     text.setBold(0, len - 1, !!st.isBold(0));
   }
 
-  /** Swaps a block of answer paragraphs for empty writing lines. */
+  /**
+   * Swaps each answer paragraph for the same number of empty lines, in the
+   * same font size and spacing, so the layout matches the teacher copy (for
+   * example, questions stay lined up beside their story paragraphs). A table
+   * cell that held nothing but the answer is a writing box and gets at least
+   * minAnswerLines lines.
+   */
   function blankAnswerBlock(container, indices, kids, o) {
-    var lines = 0;
-    for (var i = 0; i < indices.length; i++) {
-      var len = kids[indices[i]].text.length;
-      lines += Math.max(1, Math.ceil(len / o.charsPerAnswerLine));
+    var isBox = container.getType() === T().TABLE_CELL;
+    for (var c = 0; c < kids.length && isBox; c++) {
+      if (kids[c] && indices.indexOf(c) < 0 && /\S/.test(kids[c].text)) isBox = false;
+      if (!kids[c]) isBox = false;
     }
-    lines = Math.min(o.maxAnswerLines, Math.max(o.minAnswerLines, lines));
+    var width = lineWidth(container);
+    var fmt = null;
+    for (var j = indices.length - 1; j >= 0; j--) {
+      var i = indices[j], k = kids[i];
+      if (!/\S/.test(k.text)) continue; // blank lines inside the block stay as they are
+      fmt = lineFormat(k.el);
+      var lines = estimateLines(k.text, fmt, width, o);
+      for (var n = 0; n < lines; n++) applyFormat(container.insertParagraph(i + 1, ''), fmt);
+      container.removeChild(k.el);
+    }
+    if (isBox && fmt) {
+      var empty = 0;
+      for (var e = 0; e < container.getNumChildren(); e++) {
+        var el = container.getChild(e);
+        if (el.getType() === T().PARAGRAPH && !/\S/.test(el.getText())) empty++;
+      }
+      for (; empty < o.minAnswerLines; empty++) {
+        applyFormat(container.insertParagraph(container.getNumChildren(), ''), fmt);
+      }
+    }
+  }
 
-    var at = indices[0];
-    for (var n = 0; n < lines; n++) container.insertParagraph(at, '');
-    for (var j = indices.length - 1; j >= 0; j--) container.removeChild(container.getChild(indices[j] + lines));
+  var ATTRS = ['FONT_SIZE', 'SPACING_BEFORE', 'SPACING_AFTER', 'LINE_SPACING'];
+
+  /** Font size, spacing and indent of a paragraph, for sizing blank lines. */
+  function lineFormat(para) {
+    var A = (DocumentApp.Attribute || {});
+    var attrs = para.getAttributes ? para.getAttributes() || {} : {};
+    var fmt = {};
+    ATTRS.forEach(function (name) { if (attrs[A[name] || name] != null) fmt[name] = attrs[A[name] || name]; });
+    var text = para.editAsText();
+    if (fmt.FONT_SIZE == null && text.getFontSize && text.getText().length) fmt.FONT_SIZE = text.getFontSize(0);
+    fmt.indent = attrs[A.INDENT_START || 'INDENT_START'] || 0;
+    return fmt;
+  }
+
+  function applyFormat(para, fmt) {
+    if (!para.setAttributes) return;
+    var A = (DocumentApp.Attribute || {});
+    var attrs = {};
+    ATTRS.forEach(function (name) { if (fmt[name] != null) attrs[A[name] || name] = fmt[name]; });
+    para.setAttributes(attrs);
+  }
+
+  /** Usable line width in points, or null if the document doesn't say. */
+  function lineWidth(container) {
+    try {
+      if (container.getType() === T().TABLE_CELL && container.getWidth) {
+        var w = container.getWidth();
+        if (w) return w - (container.getPaddingLeft ? (container.getPaddingLeft() || 0) + (container.getPaddingRight() || 0) : 10);
+      }
+      if (container.getPageWidth) {
+        var pw = container.getPageWidth();
+        if (pw) return pw - (container.getMarginLeft() || 0) - (container.getMarginRight() || 0);
+      }
+    } catch (e) { /* fall back to charsPerAnswerLine */ }
+    return null;
+  }
+
+  /** How many lines the answer text filled in the teacher copy. */
+  function estimateLines(text, fmt, width, o) {
+    var perLine = o.charsPerAnswerLine;
+    if (width) {
+      var charWidth = (fmt.FONT_SIZE || 11) * 0.5; // average for Arial / Open Sans
+      perLine = Math.max(10, Math.floor((width - (fmt.indent || 0)) / charWidth));
+    }
+    return Math.max(1, Math.ceil(text.length / perLine));
   }
 
   // ------------------------------------------------------------ markers
