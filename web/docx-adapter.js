@@ -548,6 +548,29 @@ var DocxStudentCopy = (function () {
     });
   };
 
+  /**
+   * "Select all → Highlight: none", including what the text-based pass can't
+   * reach: footnote numbers and other runs with no text, and paragraph marks.
+   * Also clears answer blue left on paragraph marks, so anything a student
+   * types on a blank answer line comes out black. Returns how many it cleared.
+   */
+  function sweepFormatting(root, answerColors, removeHighlights) {
+    var n = 0;
+    descendantsW(root, 'rPr').forEach(function (rPr) {
+      if (removeHighlights) {
+        kidsW(rPr, 'highlight').concat(kidsW(rPr, 'shd')).forEach(function (h) { rPr.removeChild(h); n++; });
+      }
+      var owner = rPr.parentNode;
+      if (isW(owner, 'pPr')) {
+        kidsW(rPr, 'color').forEach(function (c) {
+          var v = (wAttr(c, 'val') || '').toLowerCase();
+          if (answerColors.indexOf('#' + v) >= 0) rPr.removeChild(c);
+        });
+      }
+    });
+    return n;
+  }
+
   /** Remembers a section break that goes away with a removed paragraph. */
   function noteSectionBreak(node, ctx) {
     if (!ctx.removedSections) return;
@@ -695,10 +718,23 @@ var DocxStudentCopy = (function () {
           if (report.removedCover && carryCoverHeaders(bodyNode, ctx.removedSections, sectionOrder)) {
             report.logoFixed = true;
           }
+          var o = options || {};
+          var colors = (o.answerColors || rules.DEFAULTS.answerColors).map(function (c) { return String(c).toLowerCase(); });
+          var sweepHighlights = o.removeHighlights !== false && rules.DEFAULTS.removeHighlights !== false;
+          report.highlightsRemoved += sweepFormatting(docXml.documentElement, colors, sweepHighlights);
           var first = descendantsW(bodyNode, 'sectPr')[0];
           report.firstPageHeaderOk = !!(first && firstW(first, 'titlePg') && refOf(first, 'headerReference', 'first'));
+          if (!report.firstPageHeaderOk) {
+            report.warnings.push('Page 1 has no separate first-page header, so it may show the small logo. Check that page 1 has the large CommonLit logo.');
+          }
+          var notes = docRels.list.filter(function (r) { return /\/(footnotes|endnotes)$/.test(r.type); });
+          var notesDone = Promise.all(notes.map(function (rel) {
+            return pkg.read('word/' + rel.target.replace(/^\/?word\//, '')).then(function (xml) {
+              if (xml) report.highlightsRemoved += sweepFormatting(xml.documentElement, colors, sweepHighlights);
+            });
+          }));
           var hf = docRels.list.filter(function (r) { return /\/(header|footer)$/.test(r.type); });
-          return Promise.all(hf.map(function (rel) {
+          return notesDone.then(function () { return Promise.all(hf.map(function (rel) {
             var path = 'word/' + rel.target.replace(/^\/?word\//, '');
             return Promise.all([pkg.read(path), pkg.ensureRels(path)]).then(function (x) {
               if (!x[0]) return;
@@ -707,7 +743,7 @@ var DocxStudentCopy = (function () {
                 rules.convertHeaderFooter(new Container(x[0].documentElement, makeCtx(x[0], x[1])), report);
               });
             });
-          }));
+          })); });
         });
       });
     }).then(function () {
@@ -723,10 +759,8 @@ var DocxStudentCopy = (function () {
         name: names.studentCopyName(base) + '.docx',
         summary: summary,
         warnings: report.warnings,
-        // The logo check is only needed when page 1 has no first-page header of its own.
-        manualChecks: names.MANUAL_CHECKS.filter(function (c) {
-          return !(report.removedCover && report.firstPageHeaderOk) || !/logo/i.test(c);
-        })
+        // Logos are handled here; see the warning below when they couldn't be.
+        manualChecks: names.MANUAL_CHECKS.filter(function (c) { return !/logo/i.test(c); })
       };
     });
 

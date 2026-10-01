@@ -138,7 +138,8 @@
       <li>Erases blue answers and leaves blank lines for students to write in.</li>
       <li>When the correct choice in a list is blue, keeps it and changes it to black.</li>
       <li>Deletes the "Answers in blue" line, the blue test-security notes, "Notes to Teacher" boxes, and optional (*) questions.</li>
-      <li>Removes highlights and comments.</li>
+      <li>Removes all highlights (including on footnote numbers) and comments.</li>
+      <li>Gives page 1 the large CommonLit logo and keeps the small logo on later pages.</li>
       <li>Renames the file: removes "Copy of" and changes TEACHER to STUDENT.</li>
     </ul>
     <p>It relies on the usual conventions: answers in the standard blue (#0000FF), and the student part starting with the Name / Class box. Based on "HOW TO: Making Student Copies for a 360 Unit".</p>
@@ -159,7 +160,7 @@
       '1 teacher-only note removed ("Answers in blue", test security)',
       '2 blue answers erased and replaced with blank lines', '3 correct choices changed from blue to black'],
     warnings: [],
-    manualChecks: MANUAL_CHECKS
+    manualChecks: MANUAL_CHECKS.filter(function (c) { return !/logo/i.test(c); })
   };
 
   var cards = document.getElementById('cards');

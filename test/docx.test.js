@@ -98,3 +98,29 @@ test('docx: footer copyright becomes the CC line with a real link, header says S
   assert.doesNotMatch(docXml, /Find Evidence|w:highlight/);
   assert.strictEqual(result.name, 'X STUDENT COPY Ed2.0.docx');
 });
+
+test('docx: removes highlights on footnote numbers and paragraph marks, and blue on blank lines', async () => {
+  const zip = new JSZip();
+  const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file('word/document.xml', `<?xml version="1.0"?><w:document xmlns:w="${W}" xmlns:r="${R}"><w:body>` +
+    `<w:p><w:r><w:t>Name: ________   Class: ________</w:t></w:r></w:p>` +
+    `<w:p><w:r><w:t xml:space="preserve">[1] One dollar and eighty-seven cents.</w:t></w:r>` +
+    `<w:r><w:rPr><w:highlight w:val="magenta"/><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="1"/></w:r></w:p>` +
+    `<w:p><w:pPr><w:rPr><w:color w:val="0000ff"/><w:highlight w:val="yellow"/></w:rPr></w:pPr></w:p>` +
+    `<w:sectPr/></w:body></w:document>`);
+  zip.file('word/_rels/document.xml.rels', `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/></Relationships>`);
+  zip.file('word/footnotes.xml', `<w:footnotes xmlns:w="${W}"><w:footnote w:id="1"><w:p><w:r><w:rPr><w:highlight w:val="magenta"/></w:rPr><w:t>a sum of money</w:t></w:r></w:p></w:footnote></w:footnotes>`);
+
+  const result = await Docx.convert(await zip.generateAsync({ type: 'uint8array' }), 'Magi TEACHER COPY.docx', env());
+  const out = await JSZip.loadAsync(result.data);
+  const docXml = await out.file('word/document.xml').async('string');
+  const notes = await out.file('word/footnotes.xml').async('string');
+  assert.doesNotMatch(docXml, /w:highlight/);
+  assert.doesNotMatch(docXml, /0000ff/i);
+  assert.match(docXml, /footnoteReference/, 'footnote number itself is kept');
+  assert.doesNotMatch(notes, /w:highlight/);
+  assert.ok(!result.manualChecks.some(c => /logo/i.test(c)), 'logo step is not left for people to do');
+  assert.ok(result.warnings.some(w => /logo/i.test(w)), 'but they are told when page 1 may have the wrong logo');
+});
