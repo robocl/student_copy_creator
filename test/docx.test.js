@@ -124,3 +124,21 @@ test('docx: removes highlights on footnote numbers and paragraph marks, and blue
   assert.ok(!result.manualChecks.some(c => /logo/i.test(c)), 'logo step is not left for people to do');
   assert.ok(result.warnings.some(w => /logo/i.test(w)), 'but they are told when page 1 may have the wrong logo');
 });
+
+test('docx: page number stays right-aligned after the CC line replaces the copyright', async () => {
+  const zip = new JSZip();
+  const run = t => `<w:r><w:t xml:space="preserve">${t}</w:t></w:r>`;
+  const tab = '<w:r><w:tab/></w:r>';
+  zip.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>');
+  zip.file('word/document.xml', `<?xml version="1.0"?><w:document xmlns:w="${W}"><w:body><w:p>${run('Name: ______  Class: ______')}</w:p>` +
+    `<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:left="720" w:right="720" w:top="360" w:bottom="0"/></w:sectPr></w:body></w:document>`);
+  zip.file('word/_rels/document.xml.rels', `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer3.xml"/></Relationships>`);
+  zip.file('word/footer3.xml', `<w:ftr xmlns:w="${W}"><w:p>${run('© CommonLit, Inc. 2026')}${tab.repeat(12)}${run('Page ')}` +
+    `<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText>PAGE</w:instrText></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>`);
+  const result = await Docx.convert(await zip.generateAsync({ type: 'uint8array' }), 'X TEACHER COPY.docx', env());
+  const footer = await (await JSZip.loadAsync(result.data)).file('word/footer3.xml').async('string');
+  assert.match(footer, /Unless otherwise noted/);
+  assert.strictEqual((footer.match(/<w:tab\/>/g) || []).length, 1, 'one tab before the page number');
+  assert.match(footer, /<w:tab w:val="right" w:pos="10800"\/>/, 'right tab stop at the right margin');
+});

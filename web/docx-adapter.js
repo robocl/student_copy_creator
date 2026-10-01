@@ -571,6 +571,56 @@ var DocxStudentCopy = (function () {
     return n;
   }
 
+  function isTabRun(r) {
+    var content = [];
+    for (var c = r.firstChild; c; c = c.nextSibling) if (c.nodeType === 1 && !isW(c, 'rPr')) content.push(c);
+    return content.length === 1 && isW(content[0], 'tab');
+  }
+  function hasPageField(p) {
+    var instr = descendantsW(p, 'instrText').map(function (n) { return n.textContent; }).join(' ');
+    var simple = descendantsW(p, 'fldSimple').map(function (n) { return wAttr(n, 'instr') || ''; }).join(' ');
+    return /\bPAGE\b/.test(instr + ' ' + simple);
+  }
+  // <w:pPr> children that must come after <w:tabs>.
+  var AFTER_TABS = ['suppressAutoHyphens', 'kinsoku', 'wordWrap', 'overflowPunct', 'topLinePunct', 'autoSpaceDE',
+    'autoSpaceDN', 'bidi', 'adjustRightInd', 'snapToGrid', 'spacing', 'ind', 'contextualSpacing', 'mirrorIndents',
+    'suppressOverlap', 'jc', 'textDirection', 'textAlignment', 'textboxTightWrap', 'outlineLvl', 'divId',
+    'cnfStyle', 'rPr', 'sectPr', 'pPrChange'];
+
+  /**
+   * Teacher footers push "Page N" to the right edge with a row of tabs after
+   * the short copyright line. Once that line becomes the much longer CC line,
+   * the same tabs wrap "Page N" toward the middle of the next line. Swap the
+   * row of tabs for one right-aligned tab stop at the right margin, so the
+   * page number stays right-aligned as on published student copies.
+   */
+  function rightAlignPageNumber(ftrRoot, textWidthTwips) {
+    var fixed = 0;
+    descendantsW(ftrRoot, 'p').forEach(function (p) {
+      var text = descendantsW(p, 't').map(function (t) { return t.textContent; }).join('');
+      if (text.indexOf('Unless otherwise noted') < 0 || !hasPageField(p)) return;
+      var tabs = descendantsW(p, 'r').filter(isTabRun);
+      if (tabs.length < 2) return;
+      tabs.slice(1).forEach(function (r) { r.parentNode.removeChild(r); });
+      var xml = p.ownerDocument;
+      var pPr = firstW(p, 'pPr');
+      if (!pPr) { pPr = xml.createElementNS(W, 'w:pPr'); p.insertBefore(pPr, p.firstChild); }
+      kidsW(pPr, 'tabs').forEach(function (t) { pPr.removeChild(t); });
+      var tabsEl = xml.createElementNS(W, 'w:tabs');
+      var tab = xml.createElementNS(W, 'w:tab');
+      tab.setAttributeNS(W, 'w:val', 'right');
+      tab.setAttributeNS(W, 'w:pos', String(textWidthTwips));
+      tabsEl.appendChild(tab);
+      var before = null;
+      for (var c = pPr.firstChild; c; c = c.nextSibling) {
+        if (isW(c) && AFTER_TABS.indexOf(c.localName) >= 0) { before = c; break; }
+      }
+      pPr.insertBefore(tabsEl, before);
+      fixed++;
+    });
+    return fixed;
+  }
+
   /** Remembers a section break that goes away with a removed paragraph. */
   function noteSectionBreak(node, ctx) {
     if (!ctx.removedSections) return;
@@ -742,6 +792,11 @@ var DocxStudentCopy = (function () {
               withDocumentApp(function () {
                 rules.convertHeaderFooter(new Container(x[0].documentElement, makeCtx(x[0], x[1])), report);
               });
+              if (/\/footer$/.test(rel.type) && report.footerLinesReplaced) {
+                var page = new Container(bodyNode, ctx);
+                var widthTwips = Math.round(((page.getPageWidth() || 612) - page.getMarginLeft() - page.getMarginRight()) * 20);
+                rightAlignPageNumber(x[0].documentElement, widthTwips);
+              }
             });
           })); });
         });
