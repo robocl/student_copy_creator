@@ -1578,7 +1578,7 @@ var DocxStudentCopy = (function () {
               withDocumentApp(function () {
                 rules.convertHeaderFooter(new Container(x[0].documentElement, makeCtx(x[0], x[1])), report);
               });
-              if (/\/footer$/.test(rel.type) && report.footerLinesReplaced) {
+              if (/\/footer$/.test(rel.type)) {
                 var page = new Container(bodyNode, ctx);
                 var widthTwips = Math.round(((page.getPageWidth() || 612) - page.getMarginLeft() - page.getMarginRight()) * 20);
                 rightAlignPageNumber(x[0].documentElement, widthTwips);

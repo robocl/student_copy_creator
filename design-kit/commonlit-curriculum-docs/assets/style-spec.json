@@ -1,0 +1,148 @@
+{
+  "name": "CommonLit curriculum documents",
+  "source": "CommonLit Design System (2025 brand) + CommonLit 360 Thematic Mini Unit template",
+  "page": {
+    "size": "US Letter",
+    "orientation": "portrait",
+    "marginLeftIn": 0.5,
+    "marginRightIn": 0.5,
+    "marginTopIn": 0.25
+  },
+  "fonts": {
+    "allowed": [
+      "Open Sans",
+      "Open Sans Light",
+      "Open Sans Medium",
+      "Open Sans SemiBold",
+      "Crimson Pro",
+      "Source Code Pro"
+    ],
+    "legacy": [
+      "Lato",
+      "Montserrat SemiBold",
+      "Nova Mono",
+      "Outfit Light",
+      "Outfit Medium",
+      "Arial"
+    ],
+    "neverBoldOpenSans": true
+  },
+  "styles": {
+    "title": {
+      "font": "Open Sans Medium",
+      "sizePt": 20
+    },
+    "sectionHeading": {
+      "font": "Open Sans Medium",
+      "sizePt": 14
+    },
+    "boxHeading": {
+      "font": "Open Sans Medium",
+      "sizePt": 14
+    },
+    "body": {
+      "font": "Open Sans Light",
+      "sizePt": 11
+    },
+    "label": {
+      "font": "Open Sans Medium",
+      "sizePt": 11,
+      "examples": [
+        "Directions:",
+        "Turn and talk:",
+        "For You:"
+      ]
+    },
+    "tableText": {
+      "font": "Open Sans Light",
+      "sizePt": 10
+    },
+    "nameLine": {
+      "font": "Open Sans Light",
+      "sizePt": 10,
+      "text": "Name: ____________   Class: ____________"
+    },
+    "metadata": {
+      "font": "Source Code Pro",
+      "sizePt": 9,
+      "allCapsAllowed": true
+    }
+  },
+  "colors": {
+    "text": [
+      "#000000",
+      "#1F1727",
+      "#413A47",
+      "#57515C",
+      "#6C6771"
+    ],
+    "answer": "#0000FF",
+    "link": [
+      "#035FE6",
+      "#1155CC"
+    ],
+    "boxFill": "#E3EEF0",
+    "boxBorder": "#C3DDE4",
+    "boxHeaderFill": "#C3DDE4",
+    "hairline": "#DDDBDA",
+    "accentFills": {
+      "blueGray300": "#C7DCE1",
+      "mint300": "#CAD696",
+      "mint200": "#E4EBCA",
+      "lavender300": "#C9A2CC",
+      "lavender200": "#E7D6E8",
+      "schoolBus400": "#FFBF40"
+    },
+    "neverForText": [
+      "#FFBF40",
+      "#C7DCE1",
+      "#CAD696",
+      "#C9A2CC",
+      "#E3EEF0"
+    ],
+    "smallPrint": [
+      "#333333",
+      "#646464",
+      "#666666",
+      "#999999"
+    ]
+  },
+  "teacherCopy": {
+    "titlePrefix": "TEACHER COPY: ",
+    "header": "Teacher Copy • {unit}",
+    "footer": "© CommonLit, Inc. {year}",
+    "answerNotice": "*Answers in blue. To help us ensure assessment security, please do not post or circulate these answers online.*",
+    "optionalQuestionMarker": "*"
+  },
+  "studentCopy": {
+    "header": "Student Copy • {unit}",
+    "footer": "Unless otherwise noted, this content is licensed under the CC BY-NC-SA 4.0 license.",
+    "footerLink": {
+      "text": "CC BY-NC-SA 4.0",
+      "url": "https://creativecommons.org/licenses/by-nc-sa/4.0/"
+    },
+    "minAnswerBoxLines": 3
+  },
+  "pageNumber": {
+    "format": "Page {n}",
+    "align": "right",
+    "method": "right tab stop at the right margin",
+    "startsAt": 1
+  },
+  "questionLabels": [
+    "Find Evidence",
+    "Think and Share",
+    "Turn and Talk",
+    "Write",
+    "Poll the Class"
+  ],
+  "modalities": [
+    "Whole Class Reading",
+    "Partner Reading",
+    "Independent Reading"
+  ],
+  "fileNames": {
+    "teacher": "{NN}. {grade}G {unit} {title} TEACHER COPY Ed2.0",
+    "student": "{NN}. {grade}G {unit} {title} STUDENT COPY Ed2.0"
+  }
+}
